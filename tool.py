@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 from ImageProcess import Graphics
 
+
 # 定义压缩比，数值越大，压缩越小
 SIZE_normal = 1.0
 SIZE_small = 1.5
@@ -26,12 +27,12 @@ def directory_exists(directory):
 
 def list_img_file(directory):
     """列出目录下所有文件，并筛选出图片文件列表返回"""
-    old_list = os.listdir(directory)
-    # print old_list
+    old_list = sorted(os.listdir(directory), reverse=True)
+    print(old_list)
     new_list = []
     for filename in old_list:
         name, fileformat = filename.split(".")
-        if fileformat.lower() == "jpg" or fileformat.lower() == "png" or fileformat.lower() == "gif":
+        if fileformat.lower() == "jpg" or fileformat.lower() == "png" or fileformat.lower() == "gif" or fileformat.lower() == "jpeg":
             new_list.append(filename)
     # print new_list
     return new_list
@@ -89,40 +90,32 @@ def compress_photo():
             file_list_src.remove(file_list_des[i])
     compress('4', des_dir, src_dir, file_list_src)
 
-
 def handle_photo():
     '''根据图片的文件名处理成需要的json格式的数据
-
+    
     -----------
     最后将data.json文件存到博客的source/photos文件夹下
     '''
     src_dir, des_dir = "photos/", "min_photos/"
     file_list = list_img_file(src_dir)
+    print(file_list)
     list_info = []
-    date_list = []
     for i in range(len(file_list)):
         filename = file_list[i]
         date_str, info = filename.split("_")
         info, _ = info.split(".")
         date = datetime.strptime(date_str, "%Y-%m-%d")
-        year_month = '-'.join(date_str.split('-')[0:2])
+        year_month = date_str[0:7]            
         if i == 0:  # 处理第一个文件
-            new_dict = {"date": year_month, "arr": {'year': date.year,
-                                                    'month': date.month,
-                                                    'link': [filename],
-                                                    'text': [info],
-                                                    'type': ['image']
-                                                    }
-                        }
-            date_list.append(date)
+            new_dict = {"date": year_month, "arr":{'year': date.year,
+                                                                   'month': date.month,
+                                                                   'link': [filename],
+                                                                   'text': [info],
+                                                                   'type': ['image']
+                                                                   }
+                                        } 
             list_info.append(new_dict)
-        elif date in date_list:  # 是同一个日期,找到在 Date 数组中的索引
-            index = date_list.index(date)
-            list_info[index]['arr']['link'].append(filename)
-            list_info[index]['arr']['text'].append(info)
-            list_info[index]['arr']['type'].append('image')
-            
-        else:  # 不是同一个日期创建一个新的 dict
+        elif year_month != list_info[-1]['date']:  # 不是最后的一个日期，就新建一个dict
             new_dict = {"date": year_month, "arr":{'year': date.year,
                                                    'month': date.month,
                                                    'link': [filename],
@@ -130,28 +123,17 @@ def handle_photo():
                                                    'type': ['image']
                                                    }
                         }
-            date_list.append(date)
             list_info.append(new_dict)
-
-    list_info = SortDict(list_info)
+        else:  # 同一个日期
+            list_info[-1]['arr']['link'].append(filename)
+            list_info[-1]['arr']['text'].append(info)
+            list_info[-1]['arr']['type'].append('image')
+    list_info.reverse()  # 翻转
+    tmp = bubbleYear(list_info)
+    bubble(tmp)
     final_dict = {"list": list_info}
-    with open("../source/photos/data.json", "w") as fp:
-        json.dump(final_dict, fp)
-
-
-# 冒泡排序
-def SortDict(list_info):
-    for num in range(len(list_info)-1,0,-1):
-        for i in range(num):
-            date1 = datetime.strptime(list_info[i]['date'],"%Y-%m")
-            date2 = datetime.strptime(list_info[i+1]['date'],"%Y-%m")
-            if date1 < date2:
-                temp = list_info[i]
-                list_info[i] = list_info[i+1]
-                list_info[i+1] = temp
-    return list_info
-
-
+    with open("../blog/source/photos/ins.json","w") as fp:
+        json.dump(final_dict,fp,ensure_ascii=False)
 
 def cut_photo():
     """裁剪算法
@@ -189,12 +171,42 @@ def git_operation():
     os.system('git commit -m "add photos"')
     os.system('git push origin master')
 
+
+def bubble(bubbleList):
+    listLength = len(bubbleList)
+    while listLength > 0:
+        for i in range(listLength - 1):    # 这个循环负责设置冒泡排序进行的次数
+            # print(bubbleList[i])
+            for j in range(listLength-i-1):  # ｊ为列表下标
+                if(bubbleList[j].get('arr').get('year') == bubbleList[j+1].get('arr').get('year')):
+                    if bubbleList[j].get('arr').get('month') < bubbleList[j+1].get('arr').get('month'):
+                
+                        bubbleList[j], bubbleList[j+1] = bubbleList[j+1], bubbleList[j]
+        return bubbleList
+
+    
+        # for i in range(listLength - 1):
+        #     if(bubbleList[i].get('arr').get('year') == bubbleList[i+1].get('arr').get('year')):
+        #         if bubbleList[i].get('arr').get('month') > bubbleList[i+1].get('arr').get('month'):
+        #             bubbleList[i] = bubbleList[i] + bubbleList[i+1]
+        #             bubbleList[i+1] = bubbleList[i] - bubbleList[i+1]
+        #             bubbleList[i] = bubbleList[i] - bubbleList[i+1]
+        # listLength -= 1
+    
+def bubbleYear(bubbleList):
+    listLength = len(bubbleList)
+    while listLength > 0:
+        for i in range(listLength - 1):
+            for j in range(listLength-i-1):
+                if bubbleList[j].get('arr').get('year') < bubbleList[j+1].get('arr').get('year'):
+                    
+                    bubbleList[j], bubbleList[j+1] = bubbleList[j+1], bubbleList[j]
+        # print(bubbleList)
+        return bubbleList
+
+
 if __name__ == "__main__":
     cut_photo()        # 裁剪图片，裁剪成正方形，去中间部分
     compress_photo()   # 压缩图片，并保存到mini_photos文件夹下
-    # git_operation()    # 提交到github仓库
+  #  git_operation()    # 提交到github仓库
     handle_photo()     # 将文件处理成json格式，存到博客仓库中
-    
-    
-    
-    
